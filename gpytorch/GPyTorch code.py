@@ -27,9 +27,9 @@ from matplotlib import pyplot as plt
 from scipy.io import wavfile as wav
 from sklearn.metrics import mean_squared_error
 
-# %matplotlib inline
-# %load_ext autoreload
-# %autoreload 2
+%matplotlib inline
+%load_ext autoreload
+%autoreload 2
 
 # %% [markdown]
 # ### Audio preprocessing
@@ -38,7 +38,7 @@ from sklearn.metrics import mean_squared_error
 
 # %%
 # Retrieve the sample rate and data from the audio fragment
-rate, data = wav.read('3-notes.wav')
+rate, data = wav.read('../data/3-notes.wav')
 
 # Convert stereo to mono
 data = [x[0] for x in data]
@@ -73,19 +73,20 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
-        
+
         # Each of the individual kernels has also been decorated with a ScaleKernel
         # A scale of 1 would have no influence whatsoever, so they are added in case
         # this scale should be different to 1
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel()) * \
-        gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) * \
-        gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) * \
-        gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
-        
+            gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) * \
+            gpytorch.kernels.ScaleKernel(gpytorch.kernels.CosineKernel()) * \
+            gpytorch.kernels.ScaleKernel(gpytorch.kernels.PeriodicKernel())
+
     def forward(self, x):
         mean_x = self.mean_module(x)
         covar_x = self.covar_module(x)
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+
 
 likelihood = gpytorch.likelihoods.GaussianLikelihood()
 model = ExactGPModel(train_x, train_y, likelihood)
@@ -116,12 +117,12 @@ for i in range(training_iter):
     output = model(train_x)
     loss = -mll(output, train_y)
     loss.backward()
-    
+
     # Usually more info is displayed here, but with the amount of hyperparameters
     # it would get very cluttered and confusing
     if (i + 1) % 10 is 0:
         print('Step %d/%d - Loss: %.3f' % (i + 1, training_iter, loss.item()))
-    optimizer.step()    
+    optimizer.step()
 
 # %%
 # This prints out the raw values for each hyperparameter
@@ -139,17 +140,17 @@ model.eval()
 likelihood.eval()
 
 # Predicting the excised part of the note segment
-# The prediction is on the whole segment of the note, 
+# The prediction is on the whole segment of the note,
 # not just the excised part
 with torch.no_grad(), gpytorch.settings.fast_pred_var():
     predictions = likelihood(model(length))
-    
+
 # Plotting the predictions
 # Black dots represent training data
 # Red dots represent missing values
 # Blue line represents the prediction of the model
 with torch.no_grad():
-    plt.figure(figsize=(15,5))
+    plt.figure(figsize=(15, 5))
     plt.plot(train_x.numpy(), train_y.numpy(), '.k')
     plt.plot(length.numpy(), predictions.mean.numpy(), 'royalblue')
     plt.plot(test_x.numpy(), test_y.numpy(), '.r')

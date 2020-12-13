@@ -14,9 +14,9 @@
 # ---
 
 # %%
-# %pylab inline
-import GPy
 from scipy.io import wavfile as wav
+import GPy
+%pylab inline
 
 figsize(15, 5)
 
@@ -37,24 +37,25 @@ figsize(15, 5)
 # 2. We work on discrete computers, not idealized continuous math, so our computations will be most precise if we stick in general to quantities of order 1
 
 # %%
-rate, data = wav.read('3-notes.wav')
+rate, data = wav.read('../data/3-notes.wav')
 data = data/amax(abs(data))
-data -= mean(data) # Remove inaudible DC component (i.e., the mean)
+data -= mean(data)  # Remove inaudible DC component (i.e., the mean)
 print('Data mean =', mean(data))
 
-x = data[:,0]
+x = data[:, 0]
 t = arange(len(x))*1000./rate
 
 # %%
 plot(t, x)
-xlabel('time (msec)'); ylabel('amplitude (a.u.)');
+xlabel('time (msec)')
+ylabel('amplitude (a.u.)')
 
 # %%
 first_note = x[6100:6500]
 second_note = x[7800:8200]
 third_note = x[10000:10400]
 
-full_t = linspace(0, 400*1000./rate, 400) # msec
+full_t = linspace(0, 400*1000./rate, 400)  # msec
 full_x = first_note
 del second_note
 del third_note
@@ -65,12 +66,12 @@ test_t = full_t[200:300]
 test_x = full_x[200:300]
 
 # Add annoying singleton dimensions for use in GPy
-full_T = full_t[:,None]
-full_X = full_x[:,None]
-train_T = train_t[:,None]
-train_X = train_x[:,None]
-test_T = test_t[:,None]
-test_X = test_x[:,None]
+full_T = full_t[:, None]
+full_X = full_x[:, None]
+train_T = train_t[:, None]
+train_X = train_x[:, None]
+test_T = test_t[:, None]
+test_X = test_x[:, None]
 
 # %% [markdown]
 # ## Looking at the data
@@ -101,10 +102,10 @@ subplot(121)
 spectrum, freqs, _ = magnitude_spectrum(full_x, Fs=rate, scale='dB')
 
 # Find and annotate dominant frequency component (largest peak in the spectrum)
-fmax = freqs[argmax(spectrum)] # Hz
-f0 = fmax/2 # Hz
-Tmax = 1000./fmax # msec
-T0 = Tmax*2 # msec
+fmax = freqs[argmax(spectrum)]  # Hz
+f0 = fmax/2  # Hz
+Tmax = 1000./fmax  # msec
+T0 = Tmax*2  # msec
 
 axvline(x=f0, label='fundamental frequency', color='red')
 axvline(x=fmax, label='dominant frequency', color='black')
@@ -114,8 +115,10 @@ subplot(122)
 plot(train_t, train_x, '-', label='train')
 plot(test_t, test_x, '-', label='test', color='lightgreen')
 errorbar(10, 0, xerr=T0/2, capsize=5, label='fundamental period', color='red')
-errorbar(10, -.1, xerr=Tmax/2, capsize=5, label='period corresponding to dominant frequency')
-xlabel('time (msec)'); ylabel('amplitude (a.u.)')
+errorbar(10, -.1, xerr=Tmax/2, capsize=5,
+         label='period corresponding to dominant frequency')
+xlabel('time (msec)')
+ylabel('amplitude (a.u.)')
 legend()
 
 print('Dominant frequency component (Hz) =', fmax)
@@ -156,15 +159,16 @@ print(f'Corresponding period (msec) = ', Tmax)
 def SNR_to_noise_power(signal_power, SNR_dB):
     """
     Solve the SNR formula
-    
+
         SNR_dB = 10 log10[signal_power/noise_power]
-    
+
     for noise_power.
     """
     noise_power = signal_power*10.**(-SNR_dB/10.)
     return noise_power
 
-SNR = 20 # dB
+
+SNR = 20  # dB
 noise_var = SNR_to_noise_power(var_x, SNR)
 
 # Derive lengthscale from expected number of zero upcrossings in unit interval (1 msec)
@@ -194,7 +198,7 @@ for i in range(n):
 # stability. So we supply only the RBF kernel to this function
 m = GPy.models.GPRegression(train_T, train_X, k1, noise_var=noise_var)
 
-# %run display_m.ipy
+%run display_m.ipy
 
 # %% [markdown]
 # ### Optimize
@@ -204,15 +208,17 @@ m = GPy.models.GPRegression(train_T, train_X, k1, noise_var=noise_var)
 # %%
 m.optimize(messages=True)
 
-zero_crossing_rate_per_msec = 1/(m.gridRBF.lengthscale*2*pi) # Rasmussen & Williams (2006, 83)
-print('Equivalent mean zero upcrossing rate (Hz) =', 1000./(m.gridRBF.lengthscale*2*pi))
+# Rasmussen & Williams (2006, 83)
+zero_crossing_rate_per_msec = 1/(m.gridRBF.lengthscale*2*pi)
+print('Equivalent mean zero upcrossing rate (Hz) =',
+      1000./(m.gridRBF.lengthscale*2*pi))
 
-# %run display_m.ipy
+%run display_m.ipy
 
 # %% [markdown]
 # ## Standard periodic kernel
 #
-# The standard periodic kernel is a periodic RBF kernel, i.e. the periods are modeled by a RBF kernel. 
+# The standard periodic kernel is a periodic RBF kernel, i.e. the periods are modeled by a RBF kernel.
 #
 # GPy's standard periodic kernel in 1D for period $\lambda$:
 #
@@ -238,7 +244,8 @@ print('Equivalent mean zero upcrossing rate (Hz) =', 1000./(m.gridRBF.lengthscal
 # %%
 ell_period_guess = T0/(4*pi)
 
-k = GPy.kern.StdPeriodic(1, variance = var_x, period=T0, lengthscale=ell_period_guess)
+k = GPy.kern.StdPeriodic(1, variance=var_x, period=T0,
+                         lengthscale=ell_period_guess)
 
 cov = k.K(full_T)
 
@@ -255,7 +262,7 @@ show()
 title('Compare full data spectrum with spectrum of a vanilla StdPeriodic GP sample with sensible defaults')
 magnitude_spectrum(full_x, rate, scale='dB', label='full data')
 magnitude_spectrum(x0, rate, scale='dB', color='black', label='GP sample')
-legend();
+legend()
 
 # %% [markdown]
 # ### Optimize
@@ -264,13 +271,14 @@ legend();
 m = GPy.models.GPRegression(train_T, train_X, k, noise_var=noise_var)
 m.optimize(messages=True)
 
-# %run display_m.ipy
+%run display_m.ipy
 
 xmean, cov = m.predict(full_T, full_cov=True)
 
 title('Compare full data spectrum with spectrum of inferred GP mean')
 magnitude_spectrum(full_x, rate, scale='dB', label='full data')
-magnitude_spectrum(xmean[:,0], rate, scale='dB', color='black', label='GP mean')
+magnitude_spectrum(xmean[:, 0], rate, scale='dB',
+                   color='black', label='GP mean')
 legend()
 show()
 
@@ -279,7 +287,7 @@ xmean, cov = m.predict(test_T, full_cov=True)
 plot(test_t, test_x, color='lightgreen')
 n = 5
 for i in range(n):
-    x0 = multivariate_normal(xmean[:,0], cov)
+    x0 = multivariate_normal(xmean[:, 0], cov)
     plot(test_t, x0, alpha=1/n, color='black')
 
 show()
@@ -294,17 +302,19 @@ show()
 # %%
 ell_guess_modulator = 50*T0/(2*pi)
 
-k1 = GPy.kern.GridRBF(1, variance = var_x, lengthscale=ell_guess_modulator)
+k1 = GPy.kern.GridRBF(1, variance=var_x, lengthscale=ell_guess_modulator)
 
-k2 = GPy.kern.StdPeriodic(1, variance = 1., period=T0, lengthscale=ell_period_guess)
-k2.variance.fix() # Since k1 controls the variance, we can save computation and set this to one
+k2 = GPy.kern.StdPeriodic(1, variance=1., period=T0,
+                          lengthscale=ell_period_guess)
+# Since k1 controls the variance, we can save computation and set this to one
+k2.variance.fix()
 
 k = k1*k2
 
 m = GPy.models.GPRegression(train_T, train_X, k, noise_var=noise_var)
 m.optimize(messages=True)
 
-# %run display_m.ipy
+%run display_m.ipy
 
 # %% [markdown]
 # # Discussion
@@ -318,11 +328,11 @@ m.optimize(messages=True)
 # - Various ways of doing this :
 #
 #   1. Extract guesses automatically from data (here)
-#   
+#
 #   2. Use prior distributions on the parameters, e.g. Gaussians, and do MAP optimization instead of ML optimization
-#   
+#
 #   3. Use different optimizing strategy (e.g. global minimum search routines)
-#   
+#
 #   4. Use more complex models which are more tolerant to lazy initial guesses
-#   
+#
 #   I'd say points 1, 2 and 4 are crucial.
