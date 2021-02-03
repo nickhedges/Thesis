@@ -1,0 +1,32 @@
+print('--- Signal to Noise Ratio (SNR) ---')
+print('Equivalent SNR over full data (dB) =', 10.*log10(var_x/model.likelihood.noise_covar.noise.item()))
+model.eval()
+likelihood.eval()
+
+# Predict over full dataset
+with torch.no_grad(), gpytorch.settings.fast_pred_var():
+    predictions = likelihood(model(full_T))
+    xmean = predictions.mean
+    
+fig, (ax1, ax2) = plt.subplots(1, 2)
+
+ax1.set_ylim(-1, 1)
+ax1.set_title('conditioned GP mean')
+ax1.plot(train_t, train_x, 'x', label='train', color='lightblue')
+ax1.plot(test_t, test_x, label='test', color='lightgreen')
+ax1.plot(full_t, xmean, color='black')
+ax1.legend()
+
+n = 3
+for i in range(n):
+    offset = 2*i
+    ax2.plot(train_t, offset + train_x, 'x', color='lightblue')
+    ax2.plot(test_t, offset + test_x, color='lightgreen')
+    ax2.plot(full_t, offset + multivariate_normal(xmean, predictions.covariance_matrix.detach().numpy()), color='black')
+ax2.set_title('conditioned GP samples')
+
+# How did we fit the test data?
+xmean = likelihood(model(test_T)).mean
+MSE = mean((xmean.detach().numpy() - test_x)**2)
+
+print('SNR at test data (dB) =', 10.*math.log10(var(test_x)/MSE))
